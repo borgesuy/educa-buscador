@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDUCA BUSCADOR – Encontrá tu centro educativo en Uruguay</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+            min-height: 300px;
+            z-index: 1;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .marker-public {
+            background-color: #2563eb;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            font-size: 13px;
+        }
+        
+        .marker-private {
+            background-color: #059669;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            font-size: 13px;
+        }
+        
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="font-sans text-slate-800 antialiased flex flex-col h-full bg-slate-100">
+
+    <!-- Header Principal -->
+    <header class="bg-brand-900 text-white border-b border-brand-800 sticky top-0 z-30 shadow-md flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                
+                <!-- Logo & Título -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white text-brand-900 p-2.5 rounded-xl shadow-sm flex items-center justify-center">
+                        <i class="fa-solid fa-graduation-cap text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-xl font-extrabold tracking-tight flex items-center gap-2">
+                            EDUCA BUSCADOR
+                            <span class="text-[10px] sm:text-xs bg-brand-700 text-brand-100 font-semibold px-2 py-0.5 rounded-full border border-brand-600">Uruguay</span>
+                        </h1>
+                        <p class="text-xs text-brand-200 font-medium hidden sm:block">Encontrá tu centro educativo público o privado</p>
+                    </div>
+                </div>
+
+                <!-- Botones y Acciones en Header -->
+                <div class="flex items-center space-x-3">
+                    <button id="btn-toggle-filters" class="md:hidden inline-flex items-center justify-center px-3 py-2 rounded-lg text-slate-800 bg-white hover:bg-slate-100 text-xs font-bold shadow-sm">
+                        <i class="fa-solid fa-filter mr-1.5 text-brand-600"></i>
+                        <span>Filtros</span>
+                    </button>
+                    <div class="hidden sm:flex items-center space-x-2 text-xs font-semibold">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span> Pública
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Privada
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Layout Principal -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Sidebar de Filtros -->
+        <aside id="sidebar-filters" class="fixed inset-y-0 left-0 z-40 w-full sm:w-80 md:w-96 bg-white border-r border-slate-200 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static flex flex-col h-full shadow-2xl md:shadow-none">
+            
+            <!-- Header Filtros -->
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-brand-600"></i>
+                    <h2 class="font-bold text-slate-800 text-sm">Filtros de Búsqueda</h2>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="btn-reset-filters" class="text-xs font-semibold text-brand-600 hover:text-brand-800 hover:underline">
+                        Limpiar todo
+                    </button>
+                    <button id="btn-close-filters" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable Filter Form -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-5">
+                
+                <!-- Búsqueda rápida por texto -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Búsqueda directa</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="filter-search" placeholder="Nombre, barrio, localidad..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Tipo de institución -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Tipo de Institución</label>
+                    <div class="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-medium">
+                        <button type="button" class="type-btn py-1.5 px-2 rounded-lg text-center transition-all bg-white text-brand-700 shadow-xs font-bold" data-type="Todas">Todas</button>
+                        <button type="button" class="type-btn py-1.5 px-2 rounded-lg text-center transition-all text-slate-600 hover:text-slate-900" data-type="Pública">Pública</button>
+                        <button type="button" class="type-btn py-1.5 px-2 rounded-lg text-center transition-all text-slate-600 hover:text-slate-900" data-type="Privada">Privada</button>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Ubicación -->
+                <div class="space-y-3">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500">Ubicación</label>
+                    
+                    <!-- Departamento -->
+                    <div>
+                        <label class="block text-xs text-slate-600 mb-1 font-medium">Departamento</label>
+                        <select id="filter-dept" class="w-full py-2 px-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-700 font-medium">
+                            <option value="">Todos los departamentos</option>
+                            <option value="Montevideo">Montevideo</option>
+                            <option value="Canelones">Canelones</option>
+                            <option value="Maldonado">Maldonado</option>
+                            <option value="Colonia">Colonia</option>
+                            <option value="Salto">Salto</option>
+                            <option value="Rocha">Rocha</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Oferta Educativa -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Oferta Educativa</label>
+                    <div class="space-y-2 text-slate-700">
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="Inicial" class="filter-oferta rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Educación Inicial</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="Primaria" class="filter-oferta rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Educación Primaria</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="Media" class="filter-oferta rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Educación Media Básica (Liceo)</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="Bachillerato" class="filter-oferta rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Bachillerato</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="Tecnica" class="filter-oferta rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Educación Técnica (UTU)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Accesibilidad -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                        <i class="fa-solid fa-universal-access text-brand-600 mr-1"></i> Accesibilidad
+                    </label>
+                    <div class="space-y-2 text-slate-700">
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="rampas" class="filter-access rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Rampas de acceso</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="banos" class="filter-access rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Baños adaptados</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="ascensores" class="filter-access rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Ascensores</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" value="sillas" class="filter-access rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium">Circulación para sillas de ruedas</span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <!-- Turnos y Servicios -->
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Turnos y Servicios</label>
+                    
+                    <!-- Turnos -->
+                    <div class="mb-3">
+                        <span class="text-xs text-slate-600 font-medium block mb-1.5">Turnos disponibles</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <label class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 cursor-pointer border border-slate-200 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:checked]:border-brand-300">
+                                <input type="checkbox" value="Matutino" class="filter-turno hidden">
+                                <span>Matutino</span>
+                            </label>
+                            <label class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 cursor-pointer border border-slate-200 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:checked]:border-brand-300">
+                                <input type="checkbox" value="Vespertino" class="filter-turno hidden">
+                                <span>Vespertino</span>
+                            </label>
+                            <label class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 cursor-pointer border border-slate-200 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:checked]:border-brand-300">
+                                <input type="checkbox" value="Nocturno" class="filter-turno hidden">
+                                <span>Nocturno</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Comedor & Transporte -->
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" id="filter-comedor" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium text-slate-700">Comedor / Alimentación</span>
+                        </label>
+                        <label class="flex items-center space-x-2.5 cursor-pointer hover:text-brand-600 select-none">
+                            <input type="checkbox" id="filter-transporte" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 w-4 h-4">
+                            <span class="text-xs font-medium text-slate-700">Transporte público cercano</span>
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Móvil -->
+            <div class="p-3 border-t border-slate-200 bg-slate-50 md:hidden">
+                <button id="btn-apply-mobile-filters" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-sm">
+                    Ver resultados
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col md:flex-row h-full overflow-hidden bg-slate-100">
+            
+            <!-- Panel Izquierdo: Lista de Tarjetas -->
+            <div class="w-full md:w-1/2 lg:w-5/12 flex flex-col h-full border-r border-slate-200 bg-slate-50">
+                
+                <!-- Barra Superior de Resultados y Modos de Vista Móvil -->
+                <div class="p-3.5 bg-white border-b border-slate-200 flex items-center justify-between shadow-xs">
+                    <div>
+                        <span id="results-count" class="font-extrabold text-slate-900 text-base">0</span>
+                        <span class="text-xs text-slate-500 font-medium ml-1">centros encontrados</span>
+                    </div>
+                    
+                    <!-- Toggle de Vista para pantallas pequeñas -->
+                    <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs md:hidden">
+                        <button id="view-mode-list" class="px-3 py-1 rounded-md bg-white font-bold text-slate-800 shadow-xs">Lista</button>
+                        <button id="view-mode-map" class="px-3 py-1 rounded-md font-medium text-slate-500 hover:text-slate-800">Mapa</button>
+                    </div>
+                </div>
+
+                <!-- Lista Contenedora con Scroll -->
+                <div id="cards-container" class="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 space-y-3">
+                    <!-- Las tarjetas dinámicas se inyectan aquí -->
+                </div>
+            </div>
+
+            <!-- Panel Derecho: Mapa Leaflet -->
+            <div id="map-wrapper" class="w-full md:w-1/2 lg:w-7/12 h-full relative hidden md:block">
+                <div id="map"></div>
+                <!-- Banner de advertencia si el mapa no se renderiza -->
+                <div id="map-fallback-msg" class="hidden absolute top-4 right-4 left-4 z-20 bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs text-amber-800 shadow-lg">
+                    <i class="fa-solid fa-triangle-exclamation mr-1.5 text-amber-600"></i> El servicio de mapa visual no está disponible temporalmente. Podés consultar todas las instituciones desde el listado.
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal Detallado de Institución -->
+    <div id="detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs hidden transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+            
+            <!-- Modal Header -->
+            <div id="modal-header-bg" class="p-6 bg-gradient-to-r from-brand-700 to-brand-900 text-white relative">
+                <button id="btn-close-modal" class="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="flex items-center gap-2 mb-2">
+                    <span id="modal-badge-type" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md">Pública</span>
+                    <span id="modal-dept" class="text-xs font-semibold text-brand-100">Montevideo</span>
+                </div>
+                <h2 id="modal-title" class="text-xl sm:text-2xl font-bold tracking-tight">Nombre del Centro</h2>
+                <p id="modal-address" class="text-xs sm:text-sm text-brand-100 mt-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-location-dot"></i> Dirección
+                </p>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-6 overflow-y-auto custom-scrollbar space-y-5 text-slate-700">
+                
+                <!-- Oferta y Turnos -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-book-open text-brand-600"></i> Oferta Educativa
+                        </h4>
+                        <div id="modal-oferta" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-clock text-brand-600"></i> Turnos
+                        </h4>
+                        <div id="modal-turnos" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+                </div>
+
+                <!-- Accesibilidad -->
+                <div>
+                    <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-universal-access text-brand-600"></i> Accesibilidad
+                    </h4>
+                    <div id="modal-access" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"></div>
+                </div>
+
+                <!-- Servicios -->
+                <div class="bg-blue-50/60 p-4 rounded-xl border border-blue-100 space-y-2.5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-utensils text-blue-600 mt-0.5"></i>
+                        <div>
+                            <span class="text-xs font-bold text-slate-800 block">Comedor y Alimentación</span>
+                            <span id="modal-comedor-text" class="text-xs text-slate-600">Disponible</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-bus text-blue-600 mt-0.5"></i>
+                        <div>
+                            <span class="text-xs font-bold text-slate-800 block">Transporte Público</span>
+                            <span id="modal-transporte-text" class="text-xs text-slate-600">Líneas cercanas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contacto & Acciones -->
+                <div class="border-t border-slate-100 pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="space-y-1 text-center sm:text-left text-xs">
+                        <div class="text-slate-600 flex items-center gap-2 justify-center sm:justify-start">
+                            <i class="fa-solid fa-phone text-brand-600"></i> <span id="modal-phone" class="font-semibold">+598 2123 4567</span>
+                        </div>
+                        <div class="text-slate-600 flex items-center gap-2 justify-center sm:justify-start">
+                            <i class="fa-solid fa-envelope text-brand-600"></i> <span id="modal-email" class="font-semibold">contacto@ejemplo.edu.uy</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button id="modal-btn-map" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2.5 rounded-xl transition-colors">
+                            <i class="fa-solid fa-crosshairs text-brand-600"></i>
+                            <span>Ver en mapa</span>
+                        </button>
+                        <a id="modal-btn-web" href="#" target="_blank" rel="noopener noreferrer" class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-colors">
+                            <span>Sitio Web</span>
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript - Lógica Completa de la Aplicación -->
+    <script>
+        // -------------------------------------------------------------
+        // 1. BASE DE DATOS FICTICIA REALISTA DE URUGUAY (15 INSTITUCIONES)
+        // -------------------------------------------------------------
+        const instituciones = [
+            {
+                id: 1,
+                nombre: "Liceo N° 53 Raoul Wallenberg",
+                tipo: "Pública",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Brazo Oriental",
+                direccion: "Av. San Martín 3795",
+                lat: -34.8601,
+                lng: -56.1752,
+                oferta: ["Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: false,
+                transporte: true,
+                telefono: "+598 2215 4892",
+                email: "liceo53@ces.edu.uy",
+                web: "https://www.ces.edu.uy"
+            },
+            {
+                id: 2,
+                nombre: "Liceo N° 17 Francisco Acuña de Figueroa",
+                tipo: "Pública",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Cordón",
+                direccion: "Fernández Crespo 1789",
+                lat: -34.8995,
+                lng: -56.1760,
+                oferta: ["Media"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: false,
+                transporte: true,
+                telefono: "+598 2400 1245",
+                email: "liceo17@ces.edu.uy",
+                web: "https://www.ces.edu.uy"
+            },
+            {
+                id: 3,
+                nombre: "Escuela N° 17 Brasil",
+                tipo: "Pública",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Pocitos",
+                direccion: "Av. Brasil 2980",
+                lat: -34.9172,
+                lng: -56.1488,
+                oferta: ["Inicial", "Primaria"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2707 1144",
+                email: "escuela17@dgeip.edu.uy",
+                web: "https://www.dgeip.edu.uy"
+            },
+            {
+                id: 4,
+                nombre: "UTU Brazo Oriental - Escuela Técnica",
+                tipo: "Pública",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Brazo Oriental",
+                direccion: "Av. General Flores 3894",
+                lat: -34.8624,
+                lng: -56.1668,
+                oferta: ["Tecnica", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2200 4512",
+                email: "brazooriental@utu.edu.uy",
+                web: "https://www.utu.edu.uy"
+            },
+            {
+                id: 5,
+                nombre: "Jardín de Infantes N° 213 Enriqueta Compte y Ricketts",
+                tipo: "Pública",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Aguada",
+                direccion: "Gonzalo Ramírez 2040",
+                lat: -34.9110,
+                lng: -56.1685,
+                oferta: ["Inicial"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2418 0523",
+                email: "jardin213@dgeip.edu.uy",
+                web: "https://www.dgeip.edu.uy"
+            },
+            {
+                id: 6,
+                nombre: "Colegio Stella Maris",
+                tipo: "Privada",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Carrasco",
+                direccion: "Máximo Tajes 7374",
+                lat: -34.8770,
+                lng: -56.0590,
+                oferta: ["Inicial", "Primaria", "Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2600 0401",
+                email: "info@stellamaris.edu.uy",
+                web: "https://www.stellamaris.edu.uy"
+            },
+            {
+                id: 7,
+                nombre: "Colegio y Liceo El Bioy",
+                tipo: "Privada",
+                departamento: "Montevideo",
+                ciudad: "Montevideo",
+                barrio: "Pocitos",
+                direccion: "Av. Brasil 2740",
+                lat: -34.9145,
+                lng: -56.1512,
+                oferta: ["Primaria", "Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2708 9911",
+                email: "info@elbioy.edu.uy",
+                web: "https://elbioy.edu.uy"
+            },
+            {
+                id: 8,
+                nombre: "Liceo N° 1 Tomás Berreta de Canelones",
+                tipo: "Pública",
+                departamento: "Canelones",
+                ciudad: "Canelones",
+                barrio: "Centro",
+                direccion: "Treinta y Tres 520",
+                lat: -34.5231,
+                lng: -56.2810,
+                oferta: ["Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: false,
+                transporte: true,
+                telefono: "+598 4332 2045",
+                email: "liceo1canelones@ces.edu.uy",
+                web: "https://www.ces.edu.uy"
+            },
+            {
+                id: 9,
+                nombre: "UTU Escuela Técnica de Pando",
+                tipo: "Pública",
+                departamento: "Canelones",
+                ciudad: "Pando",
+                barrio: "Centro",
+                direccion: "Iturria 1230",
+                lat: -34.7170,
+                lng: -55.9550,
+                oferta: ["Tecnica", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2292 1050",
+                email: "utupando@utu.edu.uy",
+                web: "https://www.utu.edu.uy"
+            },
+            {
+                id: 10,
+                nombre: "Colegio Ivy Thomas Memorial School",
+                tipo: "Privada",
+                departamento: "Canelones",
+                ciudad: "Ciudad de la Costa",
+                barrio: "Shangrilá",
+                direccion: "Av. Calcagno y Costanera",
+                lat: -34.8580,
+                lng: -56.0120,
+                oferta: ["Inicial", "Primaria", "Media"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 2682 2200",
+                email: "admissions@ivythomas.edu.uy",
+                web: "https://www.ivythomas.edu.uy"
+            },
+            {
+                id: 11,
+                nombre: "Liceo N° 1 Departamental de Maldonado",
+                tipo: "Pública",
+                departamento: "Maldonado",
+                ciudad: "Maldonado",
+                barrio: "Centro",
+                direccion: "18 de Julio 820",
+                lat: -34.9080,
+                lng: -54.9570,
+                oferta: ["Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: false,
+                transporte: true,
+                telefono: "+598 4222 2415",
+                email: "liceo1maldonado@ces.edu.uy",
+                web: "https://www.ces.edu.uy"
+            },
+            {
+                id: 12,
+                nombre: "International College Punta del Este",
+                tipo: "Privada",
+                departamento: "Maldonado",
+                ciudad: "Punta del Este",
+                barrio: "Design District",
+                direccion: "Av. del Mar y Bd. Artigas",
+                lat: -34.9420,
+                lng: -54.9280,
+                oferta: ["Inicial", "Primaria", "Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 4249 5500",
+                email: "info@ic.edu.uy",
+                web: "https://www.ic.edu.uy"
+            },
+            {
+                id: 13,
+                nombre: "UTU Escuela Técnica de Colonia",
+                tipo: "Pública",
+                departamento: "Colonia",
+                ciudad: "Colonia del Sacramento",
+                barrio: "Real de San Carlos",
+                direccion: "Av. Mihanovich s/n",
+                lat: -34.4530,
+                lng: -57.8540,
+                oferta: ["Tecnica", "Media"],
+                accesibilidad: { rampas: true, banos: true, ascensores: false, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 4522 3102",
+                email: "utucolonia@utu.edu.uy",
+                web: "https://www.utu.edu.uy"
+            },
+            {
+                id: 14,
+                nombre: "Liceo N° 1 de Salto 'IPOLL'",
+                tipo: "Pública",
+                departamento: "Salto",
+                ciudad: "Salto",
+                barrio: "Centro",
+                direccion: "Artigas 1050",
+                lat: -31.3890,
+                lng: -57.9600,
+                oferta: ["Media", "Bachillerato"],
+                accesibilidad: { rampas: true, banos: true, ascensores: true, sillas: true },
+                turnos: ["Matutino", "Vespertino", "Nocturno"],
+                comedor: false,
+                transporte: true,
+                telefono: "+598 4733 2410",
+                email: "ipoll@ces.edu.uy",
+                web: "https://www.ces.edu.uy"
+            },
+            {
+                id: 15,
+                nombre: "Escuela N° 1 de Rocha 'José Pedro Varela'",
+                tipo: "Pública",
+                departamento: "Rocha",
+                ciudad: "Rocha",
+                barrio: "Centro",
+                direccion: "General Artigas 145",
+                lat: -34.4815,
+                lng: -54.3330,
+                oferta: ["Inicial", "Primaria"],
+                accesibilidad: { rampas: true, banos: false, ascensores: false, sillas: false },
+                turnos: ["Matutino", "Vespertino"],
+                comedor: true,
+                transporte: true,
+                telefono: "+598 4472 2011",
+                email: "escuela1rocha@dgeip.edu.uy",
+                web: "https://www.dgeip.edu.uy"
+            }
+        ];
+
+        // -------------------------------------------------------------
+        // 2. ESTADO Y VARIABLES GLOBALES DE LA APLICACIÓN
+        // -------------------------------------------------------------
+        let map = null;
+        let markersGroup = null;
+        let tipoFiltroActual = 'Todas';
+        let datosFiltrados = [...instituciones];
+        let mapDisponible = true;
+
+        // -------------------------------------------------------------
+        // 3. INICIALIZACIÓN DE MAPA Y CONTROL DE FALLOS (SAFE INIT)
+        // -------------------------------------------------------------
+        function initMap() {
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) return;
+
+            try {
+                if (typeof L === 'undefined') {
+                    throw new Error("Leaflet no está cargado.");
+                }
+
+                map = L.map('map', {
+                    zoomControl: true,
+                    attributionControl: false
+                }).setView([-34.85, -56.15], 11);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(map);
+
+                markersGroup = L.layerGroup().addTo(map);
+                mapDisponible = true;
+                
+                setTimeout(() => {
+                    if (map) map.invalidateSize();
+                }, 300);
+
+            } catch (error) {
+                console.warn("Advertencia: El mapa visual no pudo inicializarse. Modo lista activado por defecto.", error);
+                mapDisponible = false;
+                const fallbackMsg = document.getElementById('map-fallback-msg');
+                if (fallbackMsg) fallbackMsg.classList.remove('hidden');
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 4. ACTUALIZACIÓN DE MARCADORES EN EL MAPA
+        // -------------------------------------------------------------
+        function actualizarMarcadores() {
+            if (!mapDisponible || !map || !markersGroup) return;
+
+            try {
+                markersGroup.clearLayers();
+                const bounds = [];
+
+                datosFiltrados.forEach(inst => {
+                    const esPublica = inst.tipo === 'Pública';
+                    const markerClass = esPublica ? 'marker-public' : 'marker-private';
+                    const iconHtml = `<div class="${markerClass} w-8 h-8 font-bold"><i class="fa-solid ${esPublica ? 'fa-building-columns' : 'fa-school'}"></i></div>`;
+
+                    const customIcon = L.divIcon({
+                        html: iconHtml,
+                        className: '',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        popupAnchor: [0, -14]
+                    });
+
+                    const marker = L.marker([inst.lat, inst.lng], { icon: customIcon });
+
+                    const popupContent = `
+                        <div class="p-1 max-w-[200px]">
+                            <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${esPublica ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}">${inst.tipo}</span>
+                            <h4 class="font-bold text-xs text-slate-900 mt-1 leading-snug">${inst.nombre}</h4>
+                            <p class="text-[11px] text-slate-500 mb-2">${inst.barrio}, ${inst.departamento}</p>
+                            <button onclick="abrirModal(${inst.id})" class="w-full text-center bg-brand-600 text-white text-xs py-1 rounded-lg font-bold hover:bg-brand-700 transition-colors">
+                                Ver detalles
+                            </button>
+                        </div>
+                    `;
+
+                    marker.bindPopup(popupContent);
+                    markersGroup.addLayer(marker);
+                    bounds.push([inst.lat, inst.lng]);
+                });
+
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+                }
+            } catch (err) {
+                console.error("Error al actualizar marcadores en mapa:", err);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 5. RENDERIZACIÓN DE TARJETAS EN PANEL IZQUIERDO
+        // -------------------------------------------------------------
+        function renderizarTarjetas() {
+            const container = document.getElementById('cards-container');
+            const countEl = document.getElementById('results-count');
+
+            countEl.textContent = datosFiltrados.length;
+            container.innerHTML = '';
+
+            if (datosFiltrados.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 px-4 bg-white rounded-2xl border border-dashed border-slate-300">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i>
+                        <h3 class="text-xs font-bold text-slate-700">Sin instituciones encontradas</h3>
+                        <p class="text-[11px] text-slate-500 mt-1">Pruebe ajustando los filtros de búsqueda.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            datosFiltrados.forEach(inst => {
+                const esPublica = inst.tipo === 'Pública';
+                
+                const badgesOferta = inst.oferta.map(of => {
+                    let text = of;
+                    if(of === 'Media') text = 'Liceo';
+                    if(of === 'Tecnica') text = 'UTU';
+                    return `<span class="bg-slate-100 text-slate-600 text-[10px] font-medium px-2 py-0.5 rounded border border-slate-200">${text}</span>`;
+                }).join(' ');
+
+                let accIcons = [];
+                if (inst.accesibilidad.rampas) accIcons.push('<i class="fa-solid fa-wheelchair-move text-slate-500" title="Rampas"></i>');
+                if (inst.accesibilidad.banos) accIcons.push('<i class="fa-solid fa-restroom text-slate-500" title="Baño adaptado"></i>');
+                if (inst.accesibilidad.ascensores) accIcons.push('<i class="fa-solid fa-elevator text-slate-500" title="Ascensor"></i>');
+
+                const cardHtml = `
+                    <div class="bg-white rounded-xl border border-slate-200 p-3.5 hover:shadow-md transition-all duration-200 flex flex-col justify-between space-y-2.5">
+                        <div>
+                            <div class="flex justify-between items-start gap-2 mb-1">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${esPublica ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}">
+                                    ${inst.tipo}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500">
+                                    <i class="fa-solid fa-location-dot text-brand-600 mr-1"></i>${inst.barrio}, ${inst.departamento}
+                                </span>
+                            </div>
+
+                            <h3 class="font-bold text-slate-900 text-sm leading-snug hover:text-brand-600 transition-colors cursor-pointer" onclick="abrirModal(${inst.id})">
+                                ${inst.nombre}
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">${inst.direccion}</p>
+
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                ${badgesOferta}
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-2">
+                                ${accIcons.length > 0 ? accIcons.join(' ') : '<span class="text-[10px] text-slate-400">Sin rampas/ascensor</span>'}
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button onclick="centrarEnMapa(${inst.id})" class="text-slate-500 hover:text-brand-600 font-medium text-xs px-2 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors">
+                                    <i class="fa-solid fa-crosshairs"></i>
+                                </button>
+                                <button onclick="abrirModal(${inst.id})" class="text-brand-600 hover:text-brand-800 font-bold flex items-center gap-1">
+                                    <span>Ver más</span>
+                                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                container.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        }
+
+        // -------------------------------------------------------------
+        // 6. MOTOR DE FILTRADO INTERACTIVO
+        // -------------------------------------------------------------
+        function aplicarFiltros() {
+            const textoBusqueda = document.getElementById('filter-search').value.toLowerCase().trim();
+            const dept = document.getElementById('filter-dept').value;
+            const soloComedor = document.getElementById('filter-comedor').checked;
+            const soloTransporte = document.getElementById('filter-transporte').checked;
+
+            const ofertasSeleccionadas = Array.from(document.querySelectorAll('.filter-oferta:checked')).map(c => c.value);
+            const accesibilidadSeleccionada = Array.from(document.querySelectorAll('.filter-access:checked')).map(c => c.value);
+            const turnosSeleccionados = Array.from(document.querySelectorAll('.filter-turno:checked')).map(c => c.value);
+
+            datosFiltrados = instituciones.filter(inst => {
+                // Tipo (Pública / Privada)
+                if (tipoFiltroActual !== 'Todas' && inst.tipo !== tipoFiltroActual) return false;
+                
+                // Departamento
+                if (dept && inst.departamento !== dept) return false;
+
+                // Búsqueda en texto libre
+                if (textoBusqueda) {
+                    const textMatch = inst.nombre.toLowerCase().includes(textoBusqueda) ||
+                                      inst.direccion.toLowerCase().includes(textoBusqueda) ||
+                                      inst.barrio.toLowerCase().includes(textoBusqueda) ||
+                                      inst.ciudad.toLowerCase().includes(textoBusqueda);
+                    if (!textMatch) return false;
+                }
+
+                // Servicios
+                if (soloComedor && !inst.comedor) return false;
+                if (soloTransporte && !inst.transporte) return false;
+
+                // Oferta educativa (Coincidencia parcial)
+                if (ofertasSeleccionadas.length > 0) {
+                    const tieneOferta = ofertasSeleccionadas.some(of => inst.oferta.includes(of));
+                    if (!tieneOferta) return false;
+                }
+
+                // Turnos
+                if (turnosSeleccionados.length > 0) {
+                    const tieneTurno = turnosSeleccionados.some(t => inst.turnos.includes(t));
+                    if (!tieneTurno) return false;
+                }
+
+                // Accesibilidad
+                if (accesibilidadSeleccionada.length > 0) {
+                    if (accesibilidadSeleccionada.includes('rampas') && !inst.accesibilidad.rampas) return false;
+                    if (accesibilidadSeleccionada.includes('banos') && !inst.accesibilidad.banos) return false;
+                    if (accesibilidadSeleccionada.includes('ascensores') && !inst.accesibilidad.ascensores) return false;
+                    if (accesibilidadSeleccionada.includes('sillas') && !inst.accesibilidad.sillas) return false;
+                }
+
+                return true;
+            });
+
+            renderizarTarjetas();
+            actualizarMarcadores();
+        }
+
+        // -------------------------------------------------------------
+        // 7. CENTRAR EN MAPA NAVEGACIÓN
+        // -------------------------------------------------------------
+        function centrarEnMapa(id) {
+            const inst = instituciones.find(i => i.id === id);
+            if (!inst) return;
+
+            if (window.innerWidth < 768) {
+                document.getElementById('view-mode-map').click();
+            }
+
+            if (map && mapDisponible) {
+                map.flyTo([inst.lat, inst.lng], 16, { duration: 1.2 });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // 8. MODAL DE DETALLES
+        // -------------------------------------------------------------
+        function abrirModal(id) {
+            const inst = instituciones.find(i => i.id === id);
+            if (!inst) return;
+
+            const esPublica = inst.tipo === 'Pública';
+            const modalHeader = document.getElementById('modal-header-bg');
+            
+            modalHeader.className = esPublica 
+                ? "p-6 bg-gradient-to-r from-blue-700 to-blue-900 text-white relative"
+                : "p-6 bg-gradient-to-r from-emerald-700 to-emerald-900 text-white relative";
+
+            document.getElementById('modal-badge-type').textContent = inst.tipo;
+            document.getElementById('modal-dept').textContent = `${inst.ciudad}, ${inst.departamento}`;
+            document.getElementById('modal-title').textContent = inst.nombre;
+            document.getElementById('modal-address').innerHTML = `<i class="fa-solid fa-location-dot"></i> ${inst.direccion} (${inst.barrio})`;
+
+            // Oferta
+            document.getElementById('modal-oferta').innerHTML = inst.oferta.map(o => {
+                let name = o;
+                if(o === 'Media') name = 'Educación Media (Liceo)';
+                if(o === 'Tecnica') name = 'Educación Técnica (UTU)';
+                return `<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md">${name}</span>`;
+            }).join('');
+
+            // Turnos
+            document.getElementById('modal-turnos').innerHTML = inst.turnos.map(t => 
+                `<span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-md">${t}</span>`
+            ).join('');
+
+            // Accesibilidad
+            document.getElementById('modal-access').innerHTML = `
+                <div class="flex items-center gap-2 p-2 rounded-lg ${inst.accesibilidad.rampas ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-slate-100 text-slate-400'}">
+                    <i class="fa-solid ${inst.accesibilidad.rampas ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark'}"></i> Rampas de acceso
+                </div>
+                <div class="flex items-center gap-2 p-2 rounded-lg ${inst.accesibilidad.banos ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-slate-100 text-slate-400'}">
+                    <i class="fa-solid ${inst.accesibilidad.banos ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark'}"></i> Baños adaptados
+                </div>
+                <div class="flex items-center gap-2 p-2 rounded-lg ${inst.accesibilidad.ascensores ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-slate-100 text-slate-400'}">
+                    <i class="fa-solid ${inst.accesibilidad.ascensores ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark'}"></i> Ascensores
+                </div>
+                <div class="flex items-center gap-2 p-2 rounded-lg ${inst.accesibilidad.sillas ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-slate-100 text-slate-400'}">
+                    <i class="fa-solid ${inst.accesibilidad.sillas ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark'}"></i> Acceso total en sillas de ruedas
+                </div>
+            `;
+
+            document.getElementById('modal-comedor-text').textContent = inst.comedor 
+                ? "Cuenta con servicio de comedor o alimentación." 
+                : "No dispone de comedor institucional.";
+
+            document.getElementById('modal-transporte-text').textContent = inst.transporte 
+                ? "Dispone de paradas de transporte público cercanas." 
+                : "Sin información sobre transporte cercano.";
+
+            document.getElementById('modal-phone').textContent = inst.telefono;
+            document.getElementById('modal-email').textContent = inst.email;
+            document.getElementById('modal-btn-web').href = inst.web;
+
+            // Botón "Ver en mapa" desde modal
+            const btnMap = document.getElementById('modal-btn-map');
+            btnMap.onclick = () => {
+                document.getElementById('detail-modal').classList.add('hidden');
+                centrarEnMapa(inst.id);
+            };
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // 9. EVENT LISTENERS Y BINDINGS DE INTERFAZ
+        // -------------------------------------------------------------
+        window.addEventListener('load', () => {
+            initMap();
+            renderizarTarjetas();
+
+            // Botones Selección Pública / Privada
+            const typeBtns = document.querySelectorAll('.type-btn');
+            typeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    typeBtns.forEach(b => {
+                        b.classList.remove('bg-white', 'text-brand-700', 'shadow-xs', 'font-bold');
+                        b.classList.add('text-slate-600');
+                    });
+                    btn.classList.add('bg-white', 'text-brand-700', 'shadow-xs', 'font-bold');
+                    btn.classList.remove('text-slate-600');
+
+                    tipoFiltroActual = btn.dataset.type;
+                    aplicarFiltros();
+                });
+            });
+
+            // Input Event Listeners
+            document.getElementById('filter-search').addEventListener('input', aplicarFiltros);
+            document.getElementById('filter-dept').addEventListener('change', aplicarFiltros);
+            document.getElementById('filter-comedor').addEventListener('change', aplicarFiltros);
+            document.getElementById('filter-transporte').addEventListener('change', aplicarFiltros);
+
+            document.querySelectorAll('.filter-oferta, .filter-access, .filter-turno').forEach(cb => {
+                cb.addEventListener('change', aplicarFiltros);
+            });
+
+            // Resetear Filtros
+            document.getElementById('btn-reset-filters').addEventListener('click', () => {
+                document.getElementById('filter-search').value = '';
+                document.getElementById('filter-dept').value = '';
+                document.getElementById('filter-comedor').checked = false;
+                document.getElementById('filter-transporte').checked = false;
+
+                document.querySelectorAll('.filter-oferta, .filter-access, .filter-turno').forEach(cb => cb.checked = false);
+                typeBtns[0].click();
+            });
+
+            // Toggle Sidebar Filtros Móvil
+            const sidebar = document.getElementById('sidebar-filters');
+            document.getElementById('btn-toggle-filters').addEventListener('click', () => {
+                sidebar.classList.remove('-translate-x-full');
+            });
+            document.getElementById('btn-close-filters').addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+            document.getElementById('btn-apply-mobile-filters').addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+
+            // Alternate entre Lista y Mapa en móvil
+            const mapWrapper = document.getElementById('map-wrapper');
+            const viewModeList = document.getElementById('view-mode-list');
+            const viewModeMap = document.getElementById('view-mode-map');
+
+            viewModeList.addEventListener('click', () => {
+                mapWrapper.classList.add('hidden');
+                viewModeList.classList.add('bg-white', 'font-bold', 'text-slate-800', 'shadow-xs');
+                viewModeList.classList.remove('text-slate-500');
+                viewModeMap.classList.remove('bg-white', 'font-bold', 'text-slate-800', 'shadow-xs');
+                viewModeMap.classList.add('text-slate-500');
+            });
+
+            viewModeMap.addEventListener('click', () => {
+                mapWrapper.classList.remove('hidden');
+                mapWrapper.classList.add('block');
+                viewModeMap.classList.add('bg-white', 'font-bold', 'text-slate-800', 'shadow-xs');
+                viewModeMap.classList.remove('text-slate-500');
+                viewModeList.classList.remove('bg-white', 'font-bold', 'text-slate-800', 'shadow-xs');
+                viewModeList.classList.add('text-slate-500');
+
+                if (map && mapDisponible) {
+                    setTimeout(() => map.invalidateSize(), 150);
+                }
+            });
+
+            // Cierre de Modal
+            document.getElementById('btn-close-modal').addEventListener('click', () => {
+                document.getElementById('detail-modal').classList.add('hidden');
+            });
+
+            document.getElementById('detail-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'detail-modal') {
+                    document.getElementById('detail-modal').classList.add('hidden');
+                }
+            });
+            
+            // Reajuste de mapa al cambiar el tamaño de pantalla
+            window.addEventListener('resize', () => {
+                if (map && mapDisponible) map.invalidateSize();
+            });
+        });
+    </script>
+</body>
+</html>
